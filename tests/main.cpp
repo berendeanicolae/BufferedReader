@@ -77,6 +77,14 @@ TEST(BufferedReader, Read) {
 	ReadFile(hFile, buffer2, 2048, &readSize2, nullptr);
 	EXPECT_EQ(readSize2, readSize1);
 	EXPECT_EQ(0, memcmp(buffer1, buffer2, readSize1));
+
+	for (DWORD i = 0; i < 256; ++i) {
+		SetFilePointer(hFile, i, nullptr, SEEK_SET);
+		readSize1 = reader.Read(i, buffer1, 128);
+		ReadFile(hFile, buffer2, 128, &readSize2, nullptr);
+		EXPECT_EQ(readSize2, readSize1);
+		EXPECT_EQ(0, memcmp(buffer1, buffer2, readSize1));
+	}
 }
 
 int main(int argc, char *argv[]) {
