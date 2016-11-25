@@ -41,8 +41,8 @@ TEST_F(TestFixture, BufferedReader) {
 			address = d(e) % sizes[i];
 			for (int k = 0; k < 5; ++k) {
 				offset = address + (std::min)((sizes[i] - address) ? (d(e) % (sizes[i] - address)) : 0, 1000UL);
-				size = (sizes[i] - offset) ? (d(e) % (std::min)(sizes[i] - offset, 1000UL)) : 0;
-				EXPECT_EQ(reader1->read(address, buffer1, size), reader2->read(address, buffer2, size));
+				size = (sizes[i] - offset) ? (d(e) % (sizes[i] - offset)) : 0;
+				EXPECT_EQ(reader1->read(offset, buffer1, size), reader2->read(offset, buffer2, size));
 				EXPECT_EQ(0, memcmp(buffer1, buffer2, size));
 			}
 		}
@@ -50,6 +50,35 @@ TEST_F(TestFixture, BufferedReader) {
 		reader1->close();
 		reader2->close();
 	}
+
+	delete reader1;
+	delete reader2;
+	delete[] buffer1;
+	delete[] buffer2;
+}
+
+TEST_F(TestFixture, BufferedReaderInvalid) {
+	IReader *reader1 = new Reader();
+	IReader *reader2 = new BufferedReader(1024);
+	BYTE *buffer1 = new BYTE[0x10000000](), *buffer2 = new BYTE[0x10000000]();
+
+	std::default_random_engine e;
+	std::uniform_int_distribution<DWORD> d(0, 0xFFFFFFFF);
+
+
+	reader1->open(files[0]);
+	reader2->open(files[0]);
+	DWORD address, size;
+	for (int j = 0; j < 100; ++j) {
+		address = d(e) % 1000UL;
+		for (int k = 0; k < 10; ++k) {
+			size = d(e) % 1000UL;
+			EXPECT_EQ(reader1->read(address, buffer1, size), reader2->read(address, buffer2, size));
+			EXPECT_EQ(0, memcmp(buffer1, buffer2, size));
+		}
+	}
+	reader1->close();
+	reader2->close();
 
 	delete reader1;
 	delete reader2;
@@ -85,7 +114,7 @@ TEST_F(TestFixture, BufferedReaderSpeed) {
 	start = GetTickCount();
 	for (int i = 0; i < 3; ++i) {
 		reader->open(files[i]);
-		for (int j=0; j<50000; ++j) reader->read(addresses[j].first, buffer, addresses[j].second);
+		for (int j = 0, k = i * 50000; j < 50000; ++j, ++k) reader->read(addresses[k].first, buffer, addresses[k].second);
 		reader->close();
 	}
 	stop = GetTickCount();
@@ -97,7 +126,7 @@ TEST_F(TestFixture, BufferedReaderSpeed) {
 	start = GetTickCount();
 	for (int i = 0; i < 3; ++i) {
 		reader->open(files[i]);
-		for (int j = 0; j<500; ++j) reader->read(addresses[j].first, buffer, addresses[j].second);
+		for (int j = 0, k = i * 50000; j < 50000; ++j, ++k) reader->read(addresses[k].first, buffer, addresses[k].second);
 		reader->close();
 	}
 	stop = GetTickCount();

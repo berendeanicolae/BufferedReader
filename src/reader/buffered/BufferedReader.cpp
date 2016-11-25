@@ -44,8 +44,11 @@ DWORD BufferedReader::read(const DWORD address, void* const lpbuffer, const DWOR
 		fileAddress = bufferFileAddress + bufferEnd;
 	}
 
+	if (bufferFileAddress + bufferEnd < address) return numberOfBytesRead;
+
 	while (numberOfBytesRead<nNumberOfBytesToRead) {
 		if (bufferEnd == bufferAddress) {
+			if (bufferEnd != bufferSize) return numberOfBytesRead;
 			bufferFileAddress = fileAddress;
 			ReadFile(hFile, buffer, bufferSize, &bufferEnd, nullptr);
 			bufferAddress = 0;
