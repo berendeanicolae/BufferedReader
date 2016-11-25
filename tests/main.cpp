@@ -1,90 +1,113 @@
-#include <gtest\gtest.h>
-#include <BufferedReader.h>
+#include <gtest/gtest.h>
+#include "TestFixture.h"
 
-TEST(BufferedReader, OpenClose) {
-	BufferedReader reader(1024);
+#include <random>
+#include <algorithm>
+#include "reader/Ireader.h"
+#include "reader/unbuffered/Reader.h"
+#include "reader/buffered/BufferedReader.h"
 
-	EXPECT_FALSE(reader.Close());
-	EXPECT_FALSE(reader.Open(nullptr));
-	EXPECT_FALSE(reader.Open(L"C:/temp/cwd/zbot"));
-	EXPECT_TRUE(reader.Open(L"file"));
-	EXPECT_TRUE(reader.Close());
-	EXPECT_FALSE(reader.Close());
-	EXPECT_FALSE(reader.Open(nullptr));
-
-}
-
-
-TEST(BufferedReader, InvalidRead) {
-	BufferedReader reader(256);
-	BYTE buffer[8192] = {};
-
-	EXPECT_EQ(0, reader.Read(nullptr, 0));
-	EXPECT_EQ(0, reader.Read(buffer, 0));
-	EXPECT_EQ(0, reader.Read(nullptr, 128));
-	EXPECT_EQ(0, reader.Read(buffer, 128));
-	EXPECT_EQ(0, reader.Read(nullptr, 512));
-	EXPECT_EQ(0, reader.Read(buffer, 512));
-}
-
-TEST(BufferedReader, Read) {
-	BufferedReader reader(256);
-	HANDLE hFile;
-	DWORD readSize1, readSize2;
-	BYTE buffer1[8192] = {}, buffer2[8192] = {};
-
-	hFile = CreateFile(L"file", GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-	if (hFile == INVALID_HANDLE_VALUE)
-		return;
-
-	EXPECT_TRUE(reader.Open(L"file"));
-	EXPECT_EQ(0, reader.Read(buffer1, 0));
-
-
-	readSize1 = reader.Read(buffer1, 128);
-	ReadFile(hFile, buffer2, 128, &readSize2, nullptr);
-	EXPECT_EQ(readSize2, readSize1);
-	EXPECT_EQ(0, memcmp(buffer1, buffer2, readSize1));
-	readSize1 = reader.Read(buffer1, 512);
-	ReadFile(hFile, buffer2, 512, &readSize2, nullptr);
-	EXPECT_EQ(readSize2, readSize1);
-	EXPECT_EQ(0, memcmp(buffer1, buffer2, readSize1));
-	readSize1 = reader.Read(buffer1, 2048);
-	ReadFile(hFile, buffer2, 2048, &readSize2, nullptr);
-	EXPECT_EQ(readSize2, readSize1);
-	EXPECT_EQ(0, memcmp(buffer1, buffer2, readSize1));
-
-	SetFilePointer(hFile, 0, nullptr, SEEK_SET);
-	readSize1 = reader.Read(0, buffer1, 128);
-	ReadFile(hFile, buffer2, 128, &readSize2, nullptr);
-	EXPECT_EQ(readSize2, readSize1);
-	EXPECT_EQ(0, memcmp(buffer1, buffer2, readSize1));
-
-	SetFilePointer(hFile, 0, nullptr, SEEK_SET);
-	readSize1 = reader.Read(0, buffer1, 256);
-	ReadFile(hFile, buffer2, 256, &readSize2, nullptr);
-	EXPECT_EQ(readSize2, readSize1);
-	EXPECT_EQ(0, memcmp(buffer1, buffer2, readSize1));
-
-	SetFilePointer(hFile, 0, nullptr, SEEK_SET);
-	readSize1 = reader.Read(0, buffer1, 2048);
-	ReadFile(hFile, buffer2, 2048, &readSize2, nullptr);
-	EXPECT_EQ(readSize2, readSize1);
-	EXPECT_EQ(0, memcmp(buffer1, buffer2, readSize1));
-
-	SetFilePointer(hFile, 0x100, nullptr, SEEK_SET);
-	readSize1 = reader.Read(0x100, buffer1, 2048);
-	ReadFile(hFile, buffer2, 2048, &readSize2, nullptr);
-	EXPECT_EQ(readSize2, readSize1);
-	EXPECT_EQ(0, memcmp(buffer1, buffer2, readSize1));
-
-	for (DWORD i = 0; i < 256; ++i) {
-		SetFilePointer(hFile, i, nullptr, SEEK_SET);
-		readSize1 = reader.Read(i, buffer1, 128);
-		ReadFile(hFile, buffer2, 128, &readSize2, nullptr);
-		EXPECT_EQ(readSize2, readSize1);
-		EXPECT_EQ(0, memcmp(buffer1, buffer2, readSize1));
+namespace testing {
+	namespace internal {
+		enum GTestColor {
+			COLOR_DEFAULT,
+			COLOR_RED,
+			COLOR_GREEN,
+			COLOR_YELLOW
+		};
+		extern void ColoredPrintf(GTestColor color, const char* fmt, ...);
 	}
+}
+
+#define PRINTF(...)  do { testing::internal::ColoredPrintf(testing::internal::COLOR_GREEN, "[          ] "); testing::internal::ColoredPrintf(testing::internal::COLOR_YELLOW, __VA_ARGS__); } while(0)
+
+TEST_F(TestFixture, BufferedReader) {
+	IReader *reader1 = new Reader();
+	IReader *reader2 = new BufferedReader(1024);
+	BYTE *buffer1 = new BYTE[0x10000000](), *buffer2 = new BYTE[0x10000000]();
+
+	std::default_random_engine e;
+	std::uniform_int_distribution<DWORD> d(0, 0xFFFFFFFF);
+
+
+	EXPECT_EQ(reader1->read(0x172, buffer1, 12), reader2->read(0x172, buffer2, 12));
+
+	for (int i = 0; i < 3; ++i) {
+		reader1->open(files[i]);
+		reader2->open(files[i]);
+
+		DWORD address, offset, size;
+		for (int j = 0; j < 100; ++j) {
+			address = d(e) % sizes[i];
+			for (int k = 0; k < 5; ++k) {
+				offset = address + (std::min)((sizes[i] - address) ? (d(e) % (sizes[i] - address)) : 0, 1000UL);
+				size = (sizes[i] - offset) ? (d(e) % (std::min)(sizes[i] - offset, 1000UL)) : 0;
+				EXPECT_EQ(reader1->read(address, buffer1, size), reader2->read(address, buffer2, size));
+				EXPECT_EQ(0, memcmp(buffer1, buffer2, size));
+			}
+		}
+
+		reader1->close();
+		reader2->close();
+	}
+
+	delete reader1;
+	delete reader2;
+	delete[] buffer1;
+	delete[] buffer2;
+}
+
+TEST_F(TestFixture, BufferedReaderSpeed) {
+	IReader *reader;
+	BYTE *buffer = new BYTE[0x10000000]();
+	std::vector<std::pair<DWORD, DWORD>> addresses;
+
+	std::default_random_engine e;
+	std::uniform_int_distribution<DWORD> d(0, 0xFFFFFFFF);
+
+
+	for (int i = 0; i < 3; ++i) {
+		DWORD address, offset, size;
+		for (int j = 0; j < 10000; ++j) {
+			address = d(e) % sizes[i];
+			for (int k = 0; k < 5; ++k) {
+				offset = address + (std::min)((sizes[i] - address) ? (d(e) % (sizes[i] - address)) : 0, 1000UL);
+				size = (sizes[i] - offset) ? (d(e) % (std::min)(sizes[i] - offset, 1000UL)) : 0;
+				addresses.push_back(std::make_pair(offset, size));
+			}
+		}
+	}
+
+
+	DWORD start, stop, time1, time2;
+
+	reader = new Reader();
+	start = GetTickCount();
+	for (int i = 0; i < 3; ++i) {
+		reader->open(files[i]);
+		for (int j=0; j<50000; ++j) reader->read(addresses[j].first, buffer, addresses[j].second);
+		reader->close();
+	}
+	stop = GetTickCount();
+	time1 = stop - start;
+	PRINTF("Reader\t%d\n", time1);
+	delete reader;
+
+	reader = new BufferedReader(1024);
+	start = GetTickCount();
+	for (int i = 0; i < 3; ++i) {
+		reader->open(files[i]);
+		for (int j = 0; j<500; ++j) reader->read(addresses[j].first, buffer, addresses[j].second);
+		reader->close();
+	}
+	stop = GetTickCount();
+	time2 = stop - start;
+	PRINTF("BufferedReader\t%d\n", time2);
+	delete reader;
+
+	EXPECT_LE(time2, time1);
+
+	delete[] buffer;
 }
 
 int main(int argc, char *argv[]) {

@@ -158,11 +158,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\BufferedReader.cpp" />
+    <ClCompile Include="src\reader\buffered\BufferedReader.cpp" />
+    <ClCompile Include="src\reader\IReader.cpp" />
+    <ClCompile Include="src\reader\unbuffered\Reader.cpp" />
     <ClCompile Include="tests\main.cpp" />
+    <ClCompile Include="tests\TestFixture.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\BufferedReader.h" />
+    <ClInclude Include="src\reader\buffered\BufferedReader.h" />
+    <ClInclude Include="src\reader\IReader.h" />
+    <ClInclude Include="src\reader\unbuffered\Reader.h" />
+    <ClInclude Include="tests\TestFixture.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
